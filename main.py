@@ -106,7 +106,7 @@ def extract_unreviewed(row):
 
 
 def extract_fp_stable(row):
-    return not ("Никогда" in row)
+    return not ("❌ Никогда" in row)
 
 
 def extract_last_review(row):
