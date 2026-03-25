@@ -5,20 +5,23 @@ import sys
 from datetime import datetime
 
 _recent_backup_sets = []
+_recent_unreviewed = []
 
 
 def build_recent_backup_sets(hours=48):
-    global _recent_backup_sets
+    global _recent_backup_sets, _recent_unreviewed
 
     now = datetime.now().timestamp()
     limit = hours * 3600
 
     sets = []
+    unreviewed_sets = []
 
     for name in os.listdir(backup_dir):
         m = re.fullmatch(rf"{re.escape(patrol_data_file)}\.bak_\d{{8}}_\d{{6}}", name)
         if not m:
             continue
+
         path = os.path.join(backup_dir, name)
         if not os.path.isfile(path):
             continue
@@ -35,14 +38,22 @@ def build_recent_backup_sets(hours=48):
 
         _, rows = split_table(text)
 
-        s = set()
-        for r in rows:
-            if r.title:
-                s.add(r.title)
+        titles = set()
+        values = {}
 
-        sets.append(s)
+        for r in rows:
+            t = extract_title(r)
+            if not t:
+                continue
+
+            titles.add(t)
+            values[t] = extract_unreviewed(r)
+
+        sets.append(titles)
+        unreviewed_sets.append(values)
 
     _recent_backup_sets = sets
+    _recent_unreviewed = unreviewed_sets
 
 
 # --- Statistics class ---
@@ -120,13 +131,18 @@ def extract_last_review(row):
 
 # --- Change logic ---
 
-def missing_in_some_recent_backup(title):
+def missing_title_in_some_recent_backup(title):
     # missing in at least one of the recent backups
     return any(title not in s for s in _recent_backup_sets)
 
+def was_unreviewed_stable(title, current_value):
+    for d in _recent_unreviewed:
+        if title in d and d[title] != current_value:
+            return False
+    return True
+
 
 def update_row(row1, row2, title):
-    row1 = remove_yellow_style_if_old(row1, title)
     cells1 = split_cells(row1)
     cells2 = split_cells(row2)
 
@@ -138,7 +154,11 @@ def update_row(row1, row2, title):
     if len(cells1) > 2 and len(cells2) > 2 and cells1[2] != cells2[2]:
         cells1[2] = cells2[2]
         changed = True
-
+    if changed:
+        row1 = mark_orange(row1)
+    else:
+        row1 = remove_yellow_if_old(row1, title)
+        row1 = remove_orange_if_stable(row1, title)
     style = row1.split("\n", 1)[0]
     return join_row(style, cells1), changed
 
@@ -160,15 +180,29 @@ def mark_yellow(row):
     cells = split_cells(row)
     return '|- style="background:#fff3cd;"\n' + "||".join(cells)
 
+def mark_orange(row):
+    cells = split_cells(row)
+    return '|- style="background:#ffcc80;"\n' + "||".join(cells)
 
-def remove_yellow_style_if_old(row, title):
+def remove_orange_if_stable(row, title):
+    lines = row.split("\n", 1)
+    style_line = lines[0]
+
+    # remove only orange color
+    if "#ffcc80" in style_line:
+        if was_unreviewed_stable(title, extract_unreviewed(row)):
+            style_line = "|-"
+
+    return style_line + "\n" + lines[1]
+
+def remove_yellow_if_old(row, title):
     lines = row.split("\n", 1)
     style_line = lines[0]
 
     # remove only yellow color
     if "#fff3cd" in style_line:
         # remove yellow ONLY if it was present in ALL backups
-        if not missing_in_some_recent_backup(title):
+        if not missing_title_in_some_recent_backup(title):
             style_line = "|-"
 
     return style_line + "\n" + lines[1]
