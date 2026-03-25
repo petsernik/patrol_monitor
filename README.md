@@ -16,7 +16,7 @@
 отличаться, скачайте новую версию и просто скопируйте в папку, после этого
 запустите скрипт, patrol_data.wikitable должна обновиться.
 
-TODO: если зелёная уже держится неделю, то удалить.
+TODO: если зелёная уже держится неделю, то удалить; несколько файлов patrol_data_01.wikitable, patrol_data_02.wikitable, ... в лексикографическом порядке.
 
 # English description
 
@@ -34,4 +34,4 @@ Then copy the downloaded file into the cloned repository and rename it to
 output changes, download the new version, and simply copy it into the folder. After that,
 run the script — `patrol_data.wikitable` will be updated.
 
-TODO: if a row has been green for a week, delete it.
+TODO: if a row has been green for a week, delete it; support multiple files patrol_data_01.wikitable, patrol_data_02.wikitable, ... in lexicographic order.
