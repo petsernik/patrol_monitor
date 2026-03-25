@@ -1,6 +1,7 @@
 import re
 import os
 import shutil
+import sys
 from datetime import datetime
 
 _recent_backup_sets = []
@@ -15,6 +16,9 @@ def build_recent_backup_sets(hours=48):
     sets = []
 
     for name in os.listdir(backup_dir):
+        m = re.fullmatch(rf"{re.escape(patrol_data_file)}\.bak_\d{{8}}_\d{{6}}", name)
+        if not m:
+            continue
         path = os.path.join(backup_dir, name)
         if not os.path.isfile(path):
             continue
@@ -251,7 +255,10 @@ def enforce_folder_limit(folder, max_bytes):
 # --- Execution ---
 
 if __name__ == "__main__":
-    file1 = "patrol_data.wikitable"
+    patrol_data_file = sys.argv[1] if len(sys.argv) > 1 else "patrol_data.wikitable"
+    if patrol_data_file.startswith("quarry"):
+        raise ValueError("Main file must not start with 'quarry'")
+
     quarry_folder = os.path.dirname(os.path.abspath(__file__))
 
     # 📁 create backups and quarries folder
@@ -268,7 +275,7 @@ if __name__ == "__main__":
     )
 
     # 💾 save backup
-    shutil.copy(file1, backup_path)
+    shutil.copy(patrol_data_file, backup_path)
     print(f"Backup created: {backup_path}")
 
     # cache recent backups
@@ -278,26 +285,28 @@ if __name__ == "__main__":
     enforce_folder_limit(backup_dir, 10 * 1024 * 1024)
 
     # 📖 read files
-    with open(file1, encoding="utf-8") as f:
+    with open(patrol_data_file, encoding="utf-8") as f:
         t1 = f.read()
 
     # read all quarry*.wikitable files
     quarry_files = []
     quarry_paths = []
 
-    for root, _, files in os.walk(quarry_folder):
-        for filename in files:
-            if re.fullmatch(r"quarry.*\.wikitable", filename):
-                path = os.path.join(root, filename)
-                with open(path, encoding="utf-8") as f:
-                    quarry_files.append(f.read())
-                quarry_paths.append(path)
+    for filename in os.listdir(quarry_folder):
+        if re.fullmatch(r"quarry.*\.wikitable", filename):
+            path = os.path.join(quarry_folder, filename)
+            with open(path, encoding="utf-8") as f:
+                quarry_files.append(f.read())
+            quarry_paths.append(path)
+
+    if not quarry_paths:
+        raise FileNotFoundError("No quarry files found")
 
     # ⚙️ processing
     result, stats = process(t1, quarry_files)
 
     # ✍️ overwrite
-    with open(file1, "w", encoding="utf-8") as f:
+    with open(patrol_data_file, "w", encoding="utf-8") as f:
         f.write(result)
 
     # 📦 move processed quarry files
