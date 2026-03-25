@@ -17,3 +17,19 @@
 запустите скрипт, patrol_data.wikitable должна обновиться.
 
 TODO: если зелёная уже держится неделю, то удалить.
+
+The program updates the table for patrollers without removing old rows. New rows are highlighted in yellow (the yellow color will fade after 48 hours). Reviewed entries are marked in green (and the labels in the text are updated).
+
+Inspired by suggestions from Wikipedian [Ailbeve](https://ru.wikipedia.org/wiki/Участник:Ailbeve)
+(see [discussion](https://ru.wikipedia.org/w/index.php?title=Обсуждение_Википедии:Запросы_к_патрулирующим#Периодически_проверять/публиковать_статьи_на_которые_ссылаются_правила)),
+and based on queries in [Quarry](https://quarry.wmcloud.org).
+
+How to use: open https://quarry.wmcloud.org/query/103590, fork it with one click,
+run it, and get the table. You can download it as a file: Download Data > wikitable.
+
+Then copy the downloaded file into the cloned repository and rename it to
+`patrol_data.wikitable` (it will be updated by the script afterward). Wait until the Quarry
+output changes, download the new version, and simply copy it into the folder. After that,
+run the script — `patrol_data.wikitable` will be updated.
+
+TODO: if a row has been green for a week, delete it.
