@@ -176,6 +176,28 @@ def remove_yellow_style_if_old(row, title):
 
 # --- Main processing ---
 
+def remove_rows_present_in_other(text1: str, text2: str) -> str:
+    if not text2:
+        return text1
+
+    header1, rows1 = split_table(text1)
+    _, rows2 = split_table(text2)
+
+    titles2 = set()
+    for r in rows2:
+        t = extract_title(r)
+        if t:
+            titles2.add(t)
+
+    filtered_rows = []
+    for r in rows1:
+        t = extract_title(r)
+        if not t or t not in titles2:
+            filtered_rows.append(r)
+
+    return header1 + "\n" + "\n".join(filtered_rows) + "\n"
+
+
 def process(t1, quarry_texts):
     header, rows1 = split_table(t1)
 
@@ -256,8 +278,15 @@ def enforce_folder_limit(folder, max_bytes):
 
 if __name__ == "__main__":
     patrol_data_file = sys.argv[1] if len(sys.argv) > 1 else "patrol_data.wikitable"
-    if patrol_data_file.startswith("quarry"):
-        raise ValueError("Main file must not start with 'quarry'")
+    another_data_file = sys.argv[2] if len(sys.argv) > 2 else "patrol_data_Big.wikitable"
+    if not os.path.exists(another_data_file):
+        print(f"[WARN] No such file: {another_data_file}, so it will not be used")
+        another_data_file = ""
+    if patrol_data_file == another_data_file:
+        print(f"[WARN] another_data_file can't be equal to patrol_data_file, so it will not be used")
+        another_data_file = ""
+    if patrol_data_file.startswith("quarry") or another_data_file.startswith("quarry"):
+        raise ValueError("Patrol data files must not start with 'quarry'")
 
     quarry_folder = os.path.dirname(os.path.abspath(__file__))
 
@@ -271,7 +300,7 @@ if __name__ == "__main__":
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     backup_path = os.path.join(
         backup_dir,
-        f"patrol_data.wikitable.bak_{timestamp}"
+        f"{patrol_data_file}.wikitable.bak_{timestamp}"
     )
 
     # 💾 save backup
@@ -287,6 +316,10 @@ if __name__ == "__main__":
     # 📖 read files
     with open(patrol_data_file, encoding="utf-8") as f:
         t1 = f.read()
+    if another_data_file:
+        with open(another_data_file, encoding="utf-8") as f:
+            t2 = f.read()
+        t1 = remove_rows_present_in_other(t1, t2)
 
     # read all quarry*.wikitable files
     quarry_files = []
