@@ -6,7 +6,7 @@
 
 Вдохновлена на предложениях википедиста [Ailbeve](https://ru.wikipedia.org/wiki/Участник:Ailbeve)
 (см. [обсуждение](https://ru.wikipedia.org/w/index.php?title=Обсуждение_Википедии:Запросы_к_патрулирующим#Периодически_проверять/публиковать_статьи_на_которые_ссылаются_правила)),
-опирается на запросы в [quarry](https://quarry.wmcloud.org)
+опирается на запросы в [Quarry](https://quarry.wmcloud.org).
 
 Как применять: открываете https://quarry.wmcloud.org/query/103590, делаете форк в один клик
 и запускаете, получаете таблицу. Её можно скачать как файл: Download Data > wikitable.
