@@ -147,7 +147,7 @@ def mark_green(row):
         cells[0] = re.sub(r"\[\[(.*?)\]\]", r"<s>[[\1]]</s>", cells[0])
 
     if len(cells) > 2:
-        cells[2] = "{{done|{{comment|Отпатрулирована|или удалена из правил}}}}"
+        cells[2] = "{{done|Отпатрулирована*}}"
 
     return '|- style="background:#d0f0c0;"\n' + "||".join(cells)
 
