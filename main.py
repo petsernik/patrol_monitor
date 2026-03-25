@@ -147,7 +147,7 @@ def mark_green(row):
         cells[0] = re.sub(r"\[\[(.*?)\]\]", r"<s>[[\1]]</s>", cells[0])
 
     if len(cells) > 2:
-        cells[2] = "{{done|Отпатрулирована}}"
+        cells[2] = "{{done|{{comment|Отпатрулирована|или удалена из правил}}}}"
 
     return '|- style="background:#d0f0c0;"\n' + "||".join(cells)
 
@@ -197,7 +197,8 @@ def process(t1, quarry_texts):
             stats.green += 1
             # only in the first → green
             if "{{done" in row1 or "#d0f0c0" in row1:
-                result.append(row1)
+                # mark as patrolled
+                result.append(mark_green(row1))
             elif not "❌ Никогда" in row1:
                 # mark as patrolled
                 result.append(mark_green(row1))
