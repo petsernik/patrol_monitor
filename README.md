@@ -1,6 +1,6 @@
 # patrol_monitor
 
-Программа обновляет табличку для патрулирующих, не удаляя старые строки. Новые строки 
+Программа обновляет табличку для патрулирующих, (почти всегда) не удаляя старые строки. Новые строки 
 отмечаются жёлтым цветом (жёлтый превратится 
 в бесцветный через 48 часов). Проверенные помечаются зелёным (и надписи в тексте меняются).
 
@@ -20,7 +20,7 @@ TODO: если зелёная уже держится неделю, то уда�
 
 # English description
 
-The program updates the table for patrollers without removing old rows. New rows are highlighted in yellow (the yellow color will fade after 48 hours). Reviewed entries are marked in green (and the labels in the text are updated).
+The program updates the table for patrollers (almost always) without removing old rows. New rows are highlighted in yellow (the yellow color will fade after 48 hours). Reviewed entries are marked in green (and the labels in the text are updated).
 
 Inspired by suggestions from Wikipedian [Ailbeve](https://ru.wikipedia.org/wiki/Участник:Ailbeve)
 (see [discussion](https://ru.wikipedia.org/w/index.php?title=Обсуждение_Википедии:Запросы_к_патрулирующим#Периодически_проверять/публиковать_статьи_на_которые_ссылаются_правила)),
