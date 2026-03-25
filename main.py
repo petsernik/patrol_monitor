@@ -306,7 +306,7 @@ def enforce_folder_limit(folder, max_bytes):
     while total_size > max_bytes and files:
         path, _, size = files.pop(0)
         os.remove(path)
-        print(f"Deleted old backup: {path}")
+        print(f"Deleted old file: {path}")
         total_size -= size
 
 
@@ -329,8 +329,8 @@ if __name__ == "__main__":
     # 📁 create backups and quarries folder
     backup_dir = "backups"
     os.makedirs(backup_dir, exist_ok=True)
-    processed_dir = "quarries"
-    os.makedirs(processed_dir, exist_ok=True)
+    quarries_dir = "quarries"
+    os.makedirs(quarries_dir, exist_ok=True)
 
     # 🕒 backup filename
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -345,9 +345,6 @@ if __name__ == "__main__":
 
     # cache recent backups
     build_recent_backup_sets()
-
-    # 🧹 limit backup folder size (10 MB)
-    enforce_folder_limit(backup_dir, 10 * 1024 * 1024)
 
     # 📖 read files
     with open(patrol_data_file, encoding="utf-8") as f:
@@ -382,12 +379,16 @@ if __name__ == "__main__":
     for path in quarry_paths:
         try:
             filename = os.path.basename(path)
-            new_path = os.path.join(processed_dir, filename)
+            new_path = os.path.join(quarries_dir, filename)
 
             shutil.move(path, new_path)
             print(f"Moved: {path} -> {new_path}")
         except Exception as e:
             print(f"Failed to move {path}: {e}")
+
+    # 🧹 limit folders size (10 MB each)
+    enforce_folder_limit(backup_dir, 10 * 1024 * 1024)
+    enforce_folder_limit(quarries_dir, 10 * 1024 * 1024)
 
     print("Done ✅")
     print(stats)
