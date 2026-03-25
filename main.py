@@ -4,6 +4,25 @@ import shutil
 from datetime import datetime
 
 
+# --- Класс статистики ---
+
+class Stats:
+    def __init__(self):
+        self.added = 0
+        self.modified = 0
+        self.removed = 0
+        self.green = 0
+        self.total = 0
+
+    def __str__(self):
+        return (
+            f"Добавлено: {self.added}, "
+            f"Изменено: {self.modified}, "
+            f"Удалено: {self.removed}\n"
+            f"Отпатрулировано: {self.green} статей из {self.total}"
+        )
+
+
 # --- Парсинг таблицы ---
 
 def split_table(text):
@@ -121,33 +140,32 @@ def process(t1, quarry_texts):
                 dict2[title] = r
 
     result = []
-    changed_count = 0
-    green_count = 0
+    stats = Stats()
 
     for title, row1 in dict1.items():
         if title in dict2:
             updated_row, changed = update_row(row1, dict2[title])
             result.append(updated_row)
             if changed:
-                changed_count += 1
+                stats.modified += 1
         else:
-            green_count += 1
+            stats.green += 1
             # только в первой → зелёный
             if "{{done" in row1 or "#d0f0c0" in row1:
                 result.append(row1)
             elif not "❌ Никогда" in row1:
                 # помечаем проверенным
                 result.append(mark_green(row1))
-                changed_count += 1
+                stats.modified += 1
             else:
                 # удаляем из списка
-                changed_count += 1
+                stats.removed += 1
 
     for title, row2 in dict2.items():
         if title not in dict1:
             # только во второй → жёлтый
             result.append(mark_yellow(row2))
-            changed_count += 1
+            stats.added += 1
 
     # сортировка
     result.sort(key=lambda r: (
@@ -157,7 +175,9 @@ def process(t1, quarry_texts):
         extract_last_review(r)
     ))
 
-    return header + "\n" + "\n".join(result) + "\n", changed_count, green_count, len(result)
+    stats.total = len(result)
+
+    return header + "\n" + "\n".join(result) + "\n", stats
 
 # --- Ограничение размера бэкапов ---
 
@@ -219,12 +239,11 @@ if __name__ == "__main__":
                     quarry_files.append(f.read())
 
     # ⚙️ обработка
-    result, changed_count, green_count, count = process(t1, quarry_files)
+    result, stats = process(t1, quarry_files)
 
     # ✍️ перезапись
     with open(file1, "w", encoding="utf-8") as f:
         f.write(result)
 
     print("Done ✅")
-    print(f"Изменено/добавлено строк: {changed_count}")
-    print(f"Отпатрулировано: {green_count} статей из {count}")
+    print(stats)
