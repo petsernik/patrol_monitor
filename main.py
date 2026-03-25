@@ -3,8 +3,8 @@ import os
 import shutil
 from datetime import datetime
 
-
 _recent_backup_sets = []
+
 
 def build_recent_backup_sets(hours=48):
     global _recent_backup_sets
@@ -40,7 +40,8 @@ def build_recent_backup_sets(hours=48):
 
     _recent_backup_sets = sets
 
-# --- Класс статистики ---
+
+# --- Statistics class ---
 
 class Stats:
     def __init__(self):
@@ -52,14 +53,12 @@ class Stats:
 
     def __str__(self):
         return (
-            f"Добавлено: {self.added}, "
-            f"Изменено: {self.modified}, "
-            f"Удалено: {self.removed}\n"
-            f"Отпатрулировано: {self.green} статей из {self.total}"
+            f"Added: {self.added}, Changed: {self.modified}, Deleted: {self.removed}\n"
+            f"Patrolled: {self.green}, Total: {self.total}"
         )
 
 
-# --- Парсинг таблицы ---
+# --- Table parsing ---
 
 def split_table(text):
     lines = text.strip().splitlines()
@@ -98,7 +97,7 @@ def join_row(style, cells):
     return style + "\n" + "||".join(cells)
 
 
-# --- Поля для сортировки ---
+# --- Fields for sorting ---
 
 def extract_unreviewed(row):
     cells = split_cells(row)
@@ -115,20 +114,20 @@ def extract_last_review(row):
     return m.group(0) if m else "9999-99-99"
 
 
-# --- Логика изменений ---
+# --- Change logic ---
 
 def missing_in_some_recent_backup(title):
-    # хотя бы в одном из недавних бэкапов НЕТ
+    # missing in at least one of the recent backups
     return any(title not in s for s in _recent_backup_sets)
 
 
 def update_row(row1, row2, title):
-    row1 = remove_yellow_style(row1, title)
+    row1 = remove_yellow_style_if_old(row1, title)
     cells1 = split_cells(row1)
     cells2 = split_cells(row2)
 
     changed = False
-    # проверяем изменения в unreviewed_count и статус
+    # check changes in unreviewed_count and status
     if len(cells1) > 1 and len(cells2) > 1 and cells1[1] != cells2[1]:
         cells1[1] = cells2[1]
         changed = True
@@ -143,7 +142,7 @@ def update_row(row1, row2, title):
 def mark_green(row):
     cells = split_cells(row)
 
-    # защита от двойного <s>
+    # protect against double <s>
     if "<s>" not in cells[0]:
         cells[0] = re.sub(r"\[\[(.*?)\]\]", r"<s>[[\1]]</s>", cells[0])
 
@@ -158,20 +157,21 @@ def mark_yellow(row):
     return '|- style="background:#fff3cd;"\n' + "||".join(cells)
 
 
-def remove_yellow_style(row, title):
+def remove_yellow_style_if_old(row, title):
     lines = row.split("\n", 1)
     style_line = lines[0]
 
-    # убираем только жёлтый цвет (но с новым условием)
+    # remove only yellow color
     if "#fff3cd" in style_line:
-        # убираем жёлтый ТОЛЬКО если он был во ВСЕХ бэкапах
+        # remove yellow ONLY if it was present in ALL backups
         if not missing_in_some_recent_backup(title):
             style_line = "|-"
 
     return style_line + "\n" + lines[1]
 
 
-# --- Основная обработка ---
+# --- Main processing ---
+
 def process(t1, quarry_texts):
     header, rows1 = split_table(t1)
 
@@ -195,24 +195,24 @@ def process(t1, quarry_texts):
                 stats.modified += 1
         else:
             stats.green += 1
-            # только в первой → зелёный
+            # only in the first → green
             if "{{done" in row1 or "#d0f0c0" in row1:
                 result.append(row1)
             elif not "❌ Никогда" in row1:
-                # помечаем проверенным
+                # mark as patrolled
                 result.append(mark_green(row1))
                 stats.modified += 1
             else:
-                # удаляем из списка
+                # remove from the list
                 stats.removed += 1
 
     for title, row2 in dict2.items():
         if title not in dict1:
-            # только во второй → жёлтый
+            # only in the second → yellow
             result.append(mark_yellow(row2))
             stats.added += 1
 
-    # сортировка
+    # sorting
     result.sort(key=lambda r: (
         extract_unreviewed(r),
         extract_fp_stable(r),
@@ -225,7 +225,7 @@ def process(t1, quarry_texts):
     return header + "\n" + "\n".join(result) + "\n", stats
 
 
-# --- Ограничение размера бэкапов ---
+# --- Backup folder size limit ---
 
 def enforce_folder_limit(folder, max_bytes):
     files = []
@@ -235,7 +235,7 @@ def enforce_folder_limit(folder, max_bytes):
         if os.path.isfile(path):
             files.append((path, os.path.getmtime(path), os.path.getsize(path)))
 
-    # сортируем по времени (старые → первые)
+    # sort by time (oldest first)
     files.sort(key=lambda x: x[1])
 
     total_size = sum(f[2] for f in files)
@@ -247,38 +247,38 @@ def enforce_folder_limit(folder, max_bytes):
         total_size -= size
 
 
-# --- Запуск ---
+# --- Execution ---
 
 if __name__ == "__main__":
     file1 = "patrol_data.wikitable"
     quarry_folder = os.path.dirname(os.path.abspath(__file__))
 
-    # 📁 создаём папку backups
+    # 📁 create backups folder
     backup_dir = "backups"
     os.makedirs(backup_dir, exist_ok=True)
 
-    # 🕒 имя бэкапа
+    # 🕒 backup filename
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     backup_path = os.path.join(
         backup_dir,
         f"patrol_data.wikitable.bak_{timestamp}"
     )
 
-    # 💾 сохраняем бэкап
+    # 💾 save backup
     shutil.copy(file1, backup_path)
     print(f"Backup created: {backup_path}")
 
-    # кэшируем старые бэкапы
+    # cache recent backups
     build_recent_backup_sets()
 
-    # 🧹 ограничиваем размер папки бэкапов (10 MB)
+    # 🧹 limit backup folder size (10 MB)
     enforce_folder_limit(backup_dir, 10 * 1024 * 1024)
 
-    # 📖 читаем файлы
+    # 📖 read files
     with open(file1, encoding="utf-8") as f:
         t1 = f.read()
 
-    # читаем все quarry*.wikitable файлы
+    # read all quarry*.wikitable files
     quarry_files = []
     for root, _, files in os.walk(quarry_folder):
         for filename in files:
@@ -287,10 +287,10 @@ if __name__ == "__main__":
                 with open(path, encoding="utf-8") as f:
                     quarry_files.append(f.read())
 
-    # ⚙️ обработка
+    # ⚙️ processing
     result, stats = process(t1, quarry_files)
 
-    # ✍️ перезапись
+    # ✍️ overwrite
     with open(file1, "w", encoding="utf-8") as f:
         f.write(result)
 
