@@ -221,7 +221,7 @@ def process(t1, quarry_texts):
 
 # --- Ограничение размера бэкапов ---
 
-def enforce_backup_limit(folder, max_bytes):
+def enforce_folder_limit(folder, max_bytes):
     files = []
 
     for name in os.listdir(folder):
@@ -263,7 +263,7 @@ if __name__ == "__main__":
     print(f"Backup created: {backup_path}")
 
     # 🧹 ограничиваем размер папки бэкапов (10 MB)
-    enforce_backup_limit(backup_dir, 10 * 1024 * 1024)
+    enforce_folder_limit(backup_dir, 10 * 1024 * 1024)
 
     # 📖 читаем файлы
     with open(file1, encoding="utf-8") as f:
