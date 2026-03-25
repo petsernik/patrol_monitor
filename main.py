@@ -4,6 +4,42 @@ import shutil
 from datetime import datetime
 
 
+_recent_backup_sets = []
+
+def build_recent_backup_sets(hours=48):
+    global _recent_backup_sets
+
+    now = datetime.now().timestamp()
+    limit = hours * 3600
+
+    sets = []
+
+    for name in os.listdir(backup_dir):
+        path = os.path.join(backup_dir, name)
+        if not os.path.isfile(path):
+            continue
+
+        mtime = os.path.getmtime(path)
+        if now - mtime > limit:
+            continue
+
+        try:
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+        except:
+            continue
+
+        _, rows = split_table(text)
+
+        s = set()
+        for r in rows:
+            if r.title:
+                s.add(r.title)
+
+        sets.append(s)
+
+    _recent_backup_sets = sets
+
 # --- Класс статистики ---
 
 class Stats:
@@ -81,39 +117,9 @@ def extract_last_review(row):
 
 # --- Логика изменений ---
 
-def missing_in_some_recent_backup(title, hours=48):
-    now = datetime.now().timestamp()
-    limit = hours * 3600
-
-    for name in os.listdir(backup_dir):
-        path = os.path.join(backup_dir, name)
-        if not os.path.isfile(path):
-            continue
-
-        mtime = os.path.getmtime(path)
-        if now - mtime > limit:
-            continue
-
-        try:
-            with open(path, encoding="utf-8") as f:
-                text = f.read()
-        except:
-            continue
-
-        _, rows = split_table(text)
-
-        exists = False
-        for r in rows:
-            if extract_title(r) == title:
-                exists = True
-                break
-
-        # ключевая логика: если хотя бы в одном бэкапе НЕТ
-        if not exists:
-            return True
-
-    # есть во всех недавних бэкапах
-    return False
+def missing_in_some_recent_backup(title):
+    # хотя бы в одном из недавних бэкапов НЕТ
+    return any(title not in s for s in _recent_backup_sets)
 
 
 def update_row(row1, row2, title):
@@ -261,6 +267,9 @@ if __name__ == "__main__":
     # 💾 сохраняем бэкап
     shutil.copy(file1, backup_path)
     print(f"Backup created: {backup_path}")
+
+    # кэшируем старые бэкапы
+    build_recent_backup_sets()
 
     # 🧹 ограничиваем размер папки бэкапов (10 MB)
     enforce_folder_limit(backup_dir, 10 * 1024 * 1024)
