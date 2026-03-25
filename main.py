@@ -254,9 +254,11 @@ if __name__ == "__main__":
     file1 = "patrol_data.wikitable"
     quarry_folder = os.path.dirname(os.path.abspath(__file__))
 
-    # 📁 create backups folder
+    # 📁 create backups and quarries folder
     backup_dir = "backups"
     os.makedirs(backup_dir, exist_ok=True)
+    processed_dir = "quarries"
+    os.makedirs(processed_dir, exist_ok=True)
 
     # 🕒 backup filename
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -281,12 +283,15 @@ if __name__ == "__main__":
 
     # read all quarry*.wikitable files
     quarry_files = []
+    quarry_paths = []
+
     for root, _, files in os.walk(quarry_folder):
         for filename in files:
             if re.fullmatch(r"quarry.*\.wikitable", filename):
                 path = os.path.join(root, filename)
                 with open(path, encoding="utf-8") as f:
                     quarry_files.append(f.read())
+                quarry_paths.append(path)
 
     # ⚙️ processing
     result, stats = process(t1, quarry_files)
@@ -294,6 +299,17 @@ if __name__ == "__main__":
     # ✍️ overwrite
     with open(file1, "w", encoding="utf-8") as f:
         f.write(result)
+
+    # 📦 move processed quarry files
+    for path in quarry_paths:
+        try:
+            filename = os.path.basename(path)
+            new_path = os.path.join(processed_dir, filename)
+
+            shutil.move(path, new_path)
+            print(f"Moved: {path} -> {new_path}")
+        except Exception as e:
+            print(f"Failed to move {path}: {e}")
 
     print("Done ✅")
     print(stats)
