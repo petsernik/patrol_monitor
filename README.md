@@ -18,6 +18,8 @@
 
 TODO: если зелёная уже держится неделю, то удалить.
 
+# English description
+
 The program updates the table for patrollers without removing old rows. New rows are highlighted in yellow (the yellow color will fade after 48 hours). Reviewed entries are marked in green (and the labels in the text are updated).
 
 Inspired by suggestions from Wikipedian [Ailbeve](https://ru.wikipedia.org/wiki/Участник:Ailbeve)
