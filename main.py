@@ -81,8 +81,43 @@ def extract_last_review(row):
 
 # --- Логика изменений ---
 
-def update_row(row1, row2):
-    row1 = remove_yellow_style(row1)
+def missing_in_some_recent_backup(title, hours=48):
+    now = datetime.now().timestamp()
+    limit = hours * 3600
+
+    for name in os.listdir(backup_dir):
+        path = os.path.join(backup_dir, name)
+        if not os.path.isfile(path):
+            continue
+
+        mtime = os.path.getmtime(path)
+        if now - mtime > limit:
+            continue
+
+        try:
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+        except:
+            continue
+
+        _, rows = split_table(text)
+
+        exists = False
+        for r in rows:
+            if extract_title(r) == title:
+                exists = True
+                break
+
+        # ключевая логика: если хотя бы в одном бэкапе НЕТ
+        if not exists:
+            return True
+
+    # есть во всех недавних бэкапах
+    return False
+
+
+def update_row(row1, row2, title):
+    row1 = remove_yellow_style(row1, title)
     cells1 = split_cells(row1)
     cells2 = split_cells(row2)
 
@@ -116,15 +151,19 @@ def mark_yellow(row):
     cells = split_cells(row)
     return '|- style="background:#fff3cd;"\n' + "||".join(cells)
 
-def remove_yellow_style(row):
+
+def remove_yellow_style(row, title):
     lines = row.split("\n", 1)
     style_line = lines[0]
 
-    # убираем только жёлтый цвет
+    # убираем только жёлтый цвет (но с новым условием)
     if "#fff3cd" in style_line:
-        style_line = "|-"
+        # убираем жёлтый ТОЛЬКО если он был во ВСЕХ бэкапах
+        if not missing_in_some_recent_backup(title):
+            style_line = "|-"
 
     return style_line + "\n" + lines[1]
+
 
 # --- Основная обработка ---
 def process(t1, quarry_texts):
@@ -144,7 +183,7 @@ def process(t1, quarry_texts):
 
     for title, row1 in dict1.items():
         if title in dict2:
-            updated_row, changed = update_row(row1, dict2[title])
+            updated_row, changed = update_row(row1, dict2[title], title)
             result.append(updated_row)
             if changed:
                 stats.modified += 1
@@ -178,6 +217,7 @@ def process(t1, quarry_texts):
     stats.total = len(result)
 
     return header + "\n" + "\n".join(result) + "\n", stats
+
 
 # --- Ограничение размера бэкапов ---
 
