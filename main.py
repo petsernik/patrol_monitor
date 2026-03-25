@@ -219,6 +219,8 @@ def process(t1, quarry_texts):
             result.append(updated_row)
             if changed:
                 stats.modified += 1
+            if "{{done" in updated_row or "#d0f0c0" in updated_row:
+                stats.green += 1
         else:
             stats.green += 1
             # only in the first → green
