@@ -350,6 +350,21 @@ def normalize_patrol_filename(value: str) -> str:
         f"Expected either ID (e.g. 103623) or filename patrol-data-XXXX.wikitable"
     )
 
+def normalize_spaces(text: str) -> str:
+    """
+    Normalize all whitespace except newlines:
+    - Tabs, non-breaking spaces, etc. → regular space
+    - Collapse multiple spaces into one
+    - Keep line breaks (\n) as is
+    - Strip leading/trailing spaces per line
+    """
+    # Replace all whitespace except newline with a space
+    text = re.sub(r'[^\S\n]+', ' ', text, flags=re.UNICODE)
+    # Collapse multiple spaces in a row into one
+    text = re.sub(r' +', ' ', text)
+    # Strip spaces at start/end of each line
+    lines = [line.strip() for line in text.splitlines()]
+    return "\n".join(lines)
 
 if __name__ == "__main__":
     raw_patrol = sys.argv[1] if len(sys.argv) > 1 else "103604"
@@ -400,11 +415,11 @@ if __name__ == "__main__":
 
     # 📖 read files
     with open(patrol_data_file, encoding="utf-8") as f:
-        t1 = f.read()
+        t1 = normalize_spaces(f.read())
 
     if another_data_file:
         with open(another_data_file, encoding="utf-8") as f:
-            t2 = f.read()
+            t2 = normalize_spaces(f.read())
         t1 = remove_rows_present_in_other(t1, t2)
 
     all_quarry_paths, latest_quarries = get_quarries()
@@ -414,7 +429,7 @@ if __name__ == "__main__":
     run, selected_path = latest_quarries[patrol_id]
     print(f"[LOG] Using quarry id={patrol_id}, run={run}")
     with open(selected_path, encoding="utf-8") as f:
-        quarry_files = [f.read()]
+        quarry_files = [normalize_spaces(f.read())]
 
     # ⚙️ processing
     result, stats = process(t1, quarry_files)
