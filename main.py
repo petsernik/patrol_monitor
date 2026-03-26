@@ -214,9 +214,9 @@ def remove_yellow_if_old(row, title):
 
 # --- Main processing ---
 
-def remove_rows_present_in_other(text1: str, text2: str) -> str:
+def remove_rows_present_in_other(text1: str, text2: str) -> tuple[str, int]:
     if not text2:
-        return text1
+        return text1, 0
 
     header1, rows1 = split_table(text1)
     _, rows2 = split_table(text2)
@@ -228,12 +228,15 @@ def remove_rows_present_in_other(text1: str, text2: str) -> str:
             titles2.add(t)
 
     filtered_rows = []
+    _removed = 0
     for r in rows1:
         t = extract_title(r)
         if not t or t not in titles2:
             filtered_rows.append(r)
+        else:
+            _removed += 1
 
-    return header1 + "\n" + "\n".join(filtered_rows) + "\n"
+    return header1 + "\n" + "\n".join(filtered_rows) + "\n", _removed
 
 
 def process(t1, quarry_texts):
@@ -417,10 +420,11 @@ if __name__ == "__main__":
     with open(patrol_data_file, encoding="utf-8") as f:
         t1 = normalize_spaces(f.read())
 
+    removed = 0
     if another_data_file:
         with open(another_data_file, encoding="utf-8") as f:
             t2 = normalize_spaces(f.read())
-        t1 = remove_rows_present_in_other(t1, t2)
+        t1, removed = remove_rows_present_in_other(t1, t2)
 
     all_quarry_paths, latest_quarries = get_quarries()
     if patrol_id not in latest_quarries:
@@ -433,6 +437,7 @@ if __name__ == "__main__":
 
     # ⚙️ processing
     result, stats = process(t1, quarry_files)
+    stats.removed += removed
 
     # ✍️ write result
     with open(patrol_data_file, "w", encoding="utf-8") as f:
