@@ -8,7 +8,7 @@ _recent_backup_sets = []
 _recent_unreviewed = []
 
 
-def build_recent_backup_sets(hours=48):
+def build_recent_backup_sets(patrol_file, hours=48):
     global _recent_backup_sets, _recent_unreviewed
 
     now = datetime.now().timestamp()
@@ -18,7 +18,7 @@ def build_recent_backup_sets(hours=48):
     unreviewed_sets = []
 
     for name in os.listdir(backup_dir):
-        m = re.fullmatch(rf"{re.escape(patrol_data_file)}\.bak_\d{{8}}_\d{{6}}", name)
+        m = re.fullmatch(rf"{re.escape(patrol_file)}\.bak_\d{{8}}_\d{{6}}", name)
         if not m:
             continue
 
@@ -32,7 +32,7 @@ def build_recent_backup_sets(hours=48):
 
         try:
             with open(path, encoding="utf-8") as f:
-                text = f.read()
+                text = normalize_spaces(f.read())
         except:
             continue
 
@@ -71,6 +71,14 @@ class Stats:
             f"Added: {self.added}, Changed: {self.modified}, Deleted: {self.removed}\n"
             f"Patrolled: {self.green}, Total: {self.total}"
         )
+
+    # added helper for summation
+    def add(self, other):
+        self.added += other.added
+        self.modified += other.modified
+        self.removed += other.removed
+        self.green += other.green
+        self.total += other.total
 
 
 # --- Table parsing ---
@@ -132,7 +140,6 @@ def extract_last_review(row):
 # --- Change logic ---
 
 def missing_title_in_some_recent_backup(title):
-    # missing in at least one of the recent backups
     return any(title not in s for s in _recent_backup_sets)
 
 
@@ -148,7 +155,6 @@ def update_row(row1, row2, title):
     cells2 = split_cells(row2)
 
     changed = False
-    # check changes in unreviewed_count and status
     if len(cells1) > 1 and len(cells2) > 1 and cells1[1] != cells2[1]:
         cells1[1] = cells2[1]
         changed = True
@@ -167,7 +173,6 @@ def update_row(row1, row2, title):
 def mark_green(row):
     cells = split_cells(row)
 
-    # protect against double <s>
     if "<s>" not in cells[0]:
         cells[0] = re.sub(r"\[\[(.*?)\]\]", r"<s>[[\1]]</s>", cells[0])
 
@@ -191,7 +196,6 @@ def remove_orange_if_stable(row, title):
     lines = row.split("\n", 1)
     style_line = lines[0]
 
-    # remove only orange color
     if "#ffcc80" in style_line:
         if was_unreviewed_stable(title, extract_unreviewed(row)):
             style_line = "|-"
@@ -203,9 +207,7 @@ def remove_yellow_if_old(row, title):
     lines = row.split("\n", 1)
     style_line = lines[0]
 
-    # remove only yellow color
     if "#fff3cd" in style_line:
-        # remove yellow ONLY if it was present in ALL backups
         if not missing_title_in_some_recent_backup(title):
             style_line = "|-"
 
@@ -239,17 +241,16 @@ def remove_rows_present_in_other(text1: str, text2: str) -> tuple[str, int]:
     return header1 + "\n" + "\n".join(filtered_rows) + "\n", _removed
 
 
-def process(t1, quarry_texts):
+def process(t1: str, quarry: str) -> tuple[str, Stats]:
     header, rows1 = split_table(t1)
 
     dict1 = {extract_title(r): r for r in rows1 if extract_title(r)}
     dict2 = {}
-    for text in quarry_texts:
-        _, rows2 = split_table(text)
-        for r in rows2:
-            title = extract_title(r)
-            if title:
-                dict2[title] = r
+    _, rows2 = split_table(quarry)
+    for r in rows2:
+        title = extract_title(r)
+        if title:
+            dict2[title] = r
 
     result = []
     stats = Stats()
@@ -264,25 +265,19 @@ def process(t1, quarry_texts):
                 stats.green += 1
         else:
             stats.green += 1
-            # only in the first → green
             if "{{done" in row1 or "#d0f0c0" in row1:
-                # mark as patrolled
                 result.append(mark_green(row1))
             elif not "❌ Никогда" in row1:
-                # mark as patrolled
                 result.append(mark_green(row1))
                 stats.modified += 1
             else:
-                # remove from the list
                 stats.removed += 1
 
     for title, row2 in dict2.items():
         if title not in dict1:
-            # only in the second → yellow
             result.append(mark_yellow(row2))
             stats.added += 1
 
-    # sorting
     result.sort(key=lambda r: (
         extract_unreviewed(r),
         extract_fp_stable(r),
@@ -293,6 +288,114 @@ def process(t1, quarry_texts):
     stats.total = len(result)
 
     return header + "\n" + "\n".join(result) + "\n", stats
+
+
+def process_single_file(patrol_file, latest_quarries):
+    m = re.fullmatch(r"patrol-data-(\d+)\.wikitable", patrol_file)
+    if not m:
+        raise ValueError(f"Invalid patrol file: {patrol_file}")
+
+    patrol_id = m.group(1)
+
+    if patrol_id not in latest_quarries:
+        raise FileNotFoundError(f"No quarry found for patrol id {patrol_id}")
+
+    run, selected_path = latest_quarries[patrol_id]
+    print(f"[LOG] Processing {patrol_file} with quarry run={run}")
+
+    with open(patrol_file, encoding="utf-8") as f:
+        t1 = normalize_spaces(f.read())
+
+    with open(selected_path, encoding="utf-8") as f:
+        quarry_text = normalize_spaces(f.read())
+
+    result, stats = process(t1, quarry_text)
+
+    with open(patrol_file, "w", encoding="utf-8") as f:
+        f.write(result)
+
+    _, rows = split_table(result)
+    titles = {extract_title(r) for r in rows if extract_title(r)}
+
+    return stats, titles
+
+
+def independent_process(*files):
+    all_quarry_paths, latest_quarries = get_quarries()
+
+    total_stats = Stats()
+
+    for f in files:
+        # validate
+        patrol_file = normalize_patrol_filename(f)
+        if not os.path.exists(patrol_file):
+            raise FileNotFoundError(patrol_file)
+
+        # build cache
+        build_recent_backup_sets(patrol_file)
+
+        # processing
+        stats, _ = process_single_file(patrol_file, latest_quarries)
+        total_stats.add(stats)
+
+    return total_stats
+
+
+def dependent_process(*files):
+    all_quarry_paths, latest_quarries = get_quarries()
+
+    total_stats = Stats()
+    accumulated_titles = set()
+
+    for f in files:
+        patrol_file = normalize_patrol_filename(f)
+
+        if not os.path.exists(patrol_file):
+            raise FileNotFoundError(patrol_file)
+
+        with open(patrol_file, encoding="utf-8") as f1:
+            t1 = normalize_spaces(f1.read())
+
+        if accumulated_titles:
+            header, rows = split_table(t1)
+            filtered_rows = []
+
+            for r in rows:
+                title = extract_title(r)
+                if not title or title not in accumulated_titles:
+                    filtered_rows.append(r)
+
+            t1 = header + "\n" + "\n".join(filtered_rows) + "\n"
+
+        m = re.fullmatch(r"patrol-data-(\d+)\.wikitable", patrol_file)
+        patrol_id = m.group(1)
+
+        if patrol_id not in latest_quarries:
+            raise FileNotFoundError(f"No quarry for {patrol_id}")
+
+        run, selected_path = latest_quarries[patrol_id]
+
+        with open(selected_path, encoding="utf-8") as f:
+            quarry_text = normalize_spaces(f.read())
+
+        # build cache
+        build_recent_backup_sets(patrol_file)
+
+        # processing
+        result, stats = process(t1, quarry_text)
+
+        with open(patrol_file, "w", encoding="utf-8") as f:
+            f.write(result)
+
+        _, rows = split_table(result)
+        for r in rows:
+            title = extract_title(r)
+            if title:
+                accumulated_titles.add(title)
+
+        total_stats.add(stats)
+
+    return total_stats
 
 
 # --- Backup folder size limit ---
@@ -341,6 +444,7 @@ def get_quarries():
 
     return all_quarry_paths, latest_quarries
 
+
 def normalize_patrol_filename(value: str) -> str:
     if re.fullmatch(r"\d+", value):
         return f"patrol-data-{value}.wikitable"
@@ -353,6 +457,7 @@ def normalize_patrol_filename(value: str) -> str:
         f"Expected either ID (e.g. 103623) or filename patrol-data-XXXX.wikitable"
     )
 
+
 def normalize_spaces(text: str) -> str:
     """
     Normalize all whitespace except newlines:
@@ -361,89 +466,69 @@ def normalize_spaces(text: str) -> str:
     - Keep line breaks (\n) as is
     - Strip leading/trailing spaces per line
     """
-    # Replace all whitespace except newline with a space
     text = re.sub(r'[^\S\n]+', ' ', text, flags=re.UNICODE)
-    # Collapse multiple spaces in a row into one
     text = re.sub(r' +', ' ', text)
-    # Strip spaces at start/end of each line
     lines = [line.strip() for line in text.splitlines()]
     return "\n".join(lines)
 
+
 if __name__ == "__main__":
-    raw_patrol = sys.argv[1] if len(sys.argv) > 1 else "103604"
-    raw_another = sys.argv[2] if len(sys.argv) > 2 else ""
+    # usage:
+    # python script.py dependent 103623 103604
+    # python script.py independent 103623 103604
 
-    patrol_data_file = normalize_patrol_filename(raw_patrol)
-    another_data_file = normalize_patrol_filename(raw_another) if raw_another else ""
-    if another_data_file and not os.path.exists(another_data_file):
-        print(f"[WARN] No such file: {another_data_file}, so it will not be used")
-        another_data_file = ""
-    if patrol_data_file == another_data_file:
-        print(f"[WARN] another_data_file can't be equal to patrol_data_file, so it will not be used")
-        another_data_file = ""
-    if patrol_data_file.startswith("quarry") or another_data_file.startswith("quarry"):
-        raise ValueError("Patrol data files must not start with 'quarry'")
-
-    # --- patrol_data-XXXX.wikitable ---
-    m = re.fullmatch(r"patrol-data-(\d+)\.wikitable", patrol_data_file)
-    if not m:
+    if len(sys.argv) < 3:
         raise ValueError(
-            f"Invalid patrol_data_file name: {patrol_data_file}\n"
-            f"Expected format: patrol-data-XXXX.wikitable"
+            "Usage:\n"
+            "  script.py dependent <files...>\n"
+            "  script.py independent <files...>"
         )
 
-    patrol_id = m.group(1)
+    mode = sys.argv[1]
+    raw_files = sys.argv[2:]
+
+    patrol_files = []
+    for rf in raw_files:
+        pf = normalize_patrol_filename(rf)
+
+        if not os.path.exists(pf):
+            raise FileNotFoundError(pf)
+
+        if pf.startswith("quarry"):
+            raise ValueError("Patrol data files must not start with 'quarry'")
+
+        patrol_files.append(pf)
 
     quarry_folder = os.path.dirname(os.path.abspath(__file__))
 
-    # 📁 create backups and quarries folder
+    # 📁 create folders
     backup_dir = "backups"
     os.makedirs(backup_dir, exist_ok=True)
+
     quarries_dir = "quarries"
     os.makedirs(quarries_dir, exist_ok=True)
 
-    # 🕒 backup
+    # 🕒 create backups for all patrol files
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_path = os.path.join(
-        backup_dir,
-        f"{patrol_data_file}.bak_{timestamp}"
-    )
-
-    # 💾 save backup
-    shutil.copy(patrol_data_file, backup_path)
-    print(f"Backup created: {backup_path}")
-
-    # cache recent backups
-    build_recent_backup_sets()
-
-    # 📖 read files
-    with open(patrol_data_file, encoding="utf-8") as f:
-        t1 = normalize_spaces(f.read())
-
-    removed = 0
-    if another_data_file:
-        with open(another_data_file, encoding="utf-8") as f:
-            t2 = normalize_spaces(f.read())
-        t1, removed = remove_rows_present_in_other(t1, t2)
-
-    all_quarry_paths, latest_quarries = get_quarries()
-    if patrol_id not in latest_quarries:
-        raise FileNotFoundError(f"No quarry found for patrol id {patrol_id}")
-
-    run, selected_path = latest_quarries[patrol_id]
-    print(f"[LOG] Using quarry id={patrol_id}, run={run}")
-    with open(selected_path, encoding="utf-8") as f:
-        quarry_files = [normalize_spaces(f.read())]
+    for pf in patrol_files:
+        backup_path = os.path.join(
+            backup_dir,
+            f"{pf}.bak_{timestamp}"
+        )
+        shutil.copy(pf, backup_path)
+        print(f"Backup created: {backup_path}")
 
     # ⚙️ processing
-    result, stats = process(t1, quarry_files)
-    stats.removed += removed
-
-    # ✍️ write result
-    with open(patrol_data_file, "w", encoding="utf-8") as f:
-        f.write(result)
+    if mode == "independent":
+        stats = independent_process(*patrol_files)
+    elif mode == "dependent":
+        stats = dependent_process(*patrol_files)
+    else:
+        raise ValueError("Mode must be 'independent' or 'dependent'")
 
     # 📦 move ALL quarry files
+    all_quarry_paths, _ = get_quarries()
+
     for path in all_quarry_paths:
         try:
             filename = os.path.basename(path)
@@ -455,8 +540,8 @@ if __name__ == "__main__":
             print(f"Failed to move {path}: {e}")
 
     # 🧹 limit folders
-    enforce_folder_limit(backup_dir, 10 * 1024 * 1024)
-    enforce_folder_limit(quarries_dir, 10 * 1024 * 1024)
+    enforce_folder_limit(backup_dir, 50 * 1024 * 1024)
+    enforce_folder_limit(quarries_dir, 50 * 1024 * 1024)
 
     print("Done ✅")
     print(stats)

@@ -1,43 +1,172 @@
 # patrol_monitor
 
-Программа обновляет табличку для патрулирующих, (почти всегда) не удаляя старые строки. Новые строки 
-отмечаются жёлтым цветом (жёлтый превратится 
-в бесцветный через 48 часов). Проверенные помечаются зелёным (и надписи в тексте меняются).
+Программа обновляет таблицы для патрулирующих, (почти всегда) не удаляя старые строки.
+Новые строки отмечаются жёлтым цветом (жёлтый исчезает через 48 часов).
+Изменённые строки временно отмечаются оранжевым (если значение стабильно — цвет исчезает).
+Проверенные помечаются зелёным (и надписи в тексте обновляются).
 
-Вдохновлена на предложениях википедиста [Ailbeve](https://ru.wikipedia.org/wiki/Участник:Ailbeve)
+Поддерживается обработка нескольких таблиц:
+
+* **независимо** (independent)
+* **последовательно с исключением пересечений** (dependent)
+
+Вдохновлена предложениями википедиста [Ailbeve](https://ru.wikipedia.org/wiki/Участник:Ailbeve)
 (см. [обсуждение](https://ru.wikipedia.org/w/index.php?title=Обсуждение_Википедии:Запросы_к_патрулирующим#Периодически_проверять/публиковать_статьи_на_которые_ссылаются_правила)),
 опирается на запросы в [Quarry](https://quarry.wmcloud.org).
 
-Как применять: открываете https://quarry.wmcloud.org/query/103590, делаете форк в один клик
-и запускаете, получаете таблицу. Её можно скачать как файл: Download Data > wikitable.
+---
 
-Далее скопируйте полученный файл в склонированный репозиторий, переименуйте его
-в patrol-data-XXXX.wikitable, где XXXX - это ID querry (например 103590, как выше), далее он будет обновляться скриптом. 
-Подождите, пока quarry станет отличаться после следующего запуска, 
-скачайте новую версию и просто скопируйте в папку, после этого
-запустите скрипт передав туда XXXX или patrol-data-XXXX.wikitable, 
-patrol-data-XXXX.wikitable должна обновиться.
+## Как использовать
 
-TODO: если зелёная уже держится неделю, то удалить; несколько файлов patrol_data_01.wikitable, patrol_data_02.wikitable, ... в лексикографическом порядке.
+1. Откройте запрос, например:
+   [https://quarry.wmcloud.org/query/103590](https://quarry.wmcloud.org/query/103590)
+
+2. Сделайте fork и запустите его.
+
+3. Скачайте результат:
+   **Download Data → wikitable**
+
+4. Поместите файл в репозиторий и переименуйте его в:
+
+```
+patrol-data-XXXX.wikitable
+```
+
+где `XXXX` — ID запроса (например, `103590`)
+
+5. После обновления Quarry:
+
+   * скачайте новый файл
+   * переместите его в папку (без переименования)
+
+6. Запустите скрипт:
+
+Один файл
+
+```
+python script.py independent 103590
+```
+
+Несколько файлов (независимо)
+
+```
+python script.py independent 103590 103591
+```
+
+Несколько файлов (зависимо)
+
+```
+python script.py dependent 103590 103591 103592
+```
+
+---
+
+## Режимы работы
+
+### Independent
+
+Каждый файл обновляется **независимо**:
+
+* данные не влияют друг на друга
+* удобно для отдельных списков
+
+### Dependent
+
+Файлы обрабатываются **последовательно**:
+
+* сначала обновляется первый файл
+* его заголовки исключаются из второго, второй обновляется
+* затем объединение исключается из третьего, третий обновляется и т.д.
+
+Это позволяет:
+
+* избегать дублирования между списками
+* строить приоритетные цепочки
+
+---
 
 # English description
 
-The program updates the table for patrollers (almost always) without removing old rows. New rows are highlighted in yellow (the yellow color will fade after 48 hours). Reviewed entries are marked in green (and the labels in the text are updated).
+The program updates patrolling tables (almost always) without removing old rows.
+
+* New rows are highlighted in yellow (the color fades after 48 hours)
+* Changed rows are temporarily marked orange (removed when stable)
+* Reviewed entries are marked green (and text labels are updated)
+
+Supports processing multiple tables:
+
+* independent mode
+* dependent mode (with deduplication across files)
 
 Inspired by suggestions from Wikipedian [Ailbeve](https://ru.wikipedia.org/wiki/Участник:Ailbeve)
-(see [discussion](https://ru.wikipedia.org/w/index.php?title=Обсуждение_Википедии:Запросы_к_патрулирующим#Периодически_проверять/публиковать_статьи_на_которые_ссылаются_правила)),
-and based on queries in [Quarry](https://quarry.wmcloud.org).
+(see [discussion](https://ru.wikipedia.org/w/index.php?title=Обсуждение_Википедии:Запросы_к_патрулирующим#Периодически_проверять/публиковать_статьи_на_которые_ссылаются_правила))
+and based on queries in Quarry: [https://quarry.wmcloud.org](https://quarry.wmcloud.org).
 
-How to use: open https://quarry.wmcloud.org/query/103590, fork it with one click,
-run it, and get the table. You can download it as a file: Download Data > wikitable.
+---
 
-Next, copy the resulting file into the cloned repository and rename it to
-`patrol-data-XXXX.wikitable`, where `XXXX` is the query ID (for example, `103590`, as above). 
-The file will then be updated by the script.
+## Usage
 
-Wait until the Quarry output changes after the next run, download the new version, and simply copy it into the folder. 
-After that, run the script, passing either `XXXX` or `patrol-data-XXXX.wikitable`. 
-The file `patrol-data-XXXX.wikitable` will be updated.
+1. Open a query, for example:
+   [https://quarry.wmcloud.org/query/103590](https://quarry.wmcloud.org/query/103590)
 
+2. Fork and run it.
 
-TODO: if a row has been green for a week, delete it; support multiple files patrol_data_01.wikitable, patrol_data_02.wikitable, ... in lexicographic order.
+3. Download the result:
+   Download Data → wikitable
+
+4. Copy the file into the repository and rename it to:
+
+```
+patrol-data-XXXX.wikitable
+```
+
+where `XXXX` is the query ID (e.g. 103590)
+
+5. When Quarry output updates:
+
+   * download the new version
+   * move the file in the folder (without renaming)
+
+6. Run the script:
+
+Single file
+
+```
+python script.py independent 103590
+```
+
+Multiple files (independent)
+
+```
+python script.py independent 103590 103591
+```
+
+Multiple files (dependent)
+
+```
+python script.py dependent 103590 103591 103592
+```
+
+---
+
+## Modes
+
+### Independent
+
+Each file is processed separately:
+
+* no interaction between files
+* useful for standalone lists
+
+### Dependent
+
+Files are processed in sequence:
+
+* first file is updated
+* its titles are removed from the second, second file is updated
+* combined titles are removed from the third, third file is updated, etc.
+
+This allows:
+
+* avoiding duplicates across lists
+* building priority chains
