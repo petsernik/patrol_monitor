@@ -135,6 +135,7 @@ def missing_title_in_some_recent_backup(title):
     # missing in at least one of the recent backups
     return any(title not in s for s in _recent_backup_sets)
 
+
 def was_unreviewed_stable(title, current_value):
     for d in _recent_unreviewed:
         if title in d and d[title] != current_value:
@@ -180,9 +181,11 @@ def mark_yellow(row):
     cells = split_cells(row)
     return '|- style="background:#fff3cd;"\n' + "||".join(cells)
 
+
 def mark_orange(row):
     cells = split_cells(row)
     return '|- style="background:#ffcc80;"\n' + "||".join(cells)
+
 
 def remove_orange_if_stable(row, title):
     lines = row.split("\n", 1)
@@ -194,6 +197,7 @@ def remove_orange_if_stable(row, title):
             style_line = "|-"
 
     return style_line + "\n" + lines[1]
+
 
 def remove_yellow_if_old(row, title):
     lines = row.split("\n", 1)
@@ -312,10 +316,48 @@ def enforce_folder_limit(folder, max_bytes):
 
 # --- Execution ---
 
+def get_quarries():
+    quarry_pattern = re.compile(r"quarry-(\d+)-.*-run(\d+)\.wikitable")
+
+    latest_quarries = {}  # {id: (run, path)}
+    all_quarry_paths = []
+
+    for filename in os.listdir(quarry_folder):
+        m = quarry_pattern.fullmatch(filename)
+        if not m:
+            continue
+
+        qid = m.group(1)
+        run = int(m.group(2))
+        path = os.path.join(quarry_folder, filename)
+
+        all_quarry_paths.append(path)
+
+        if qid not in latest_quarries or run > latest_quarries[qid][0]:
+            latest_quarries[qid] = (run, path)
+
+    return all_quarry_paths, latest_quarries
+
+def normalize_patrol_filename(value: str) -> str:
+    if re.fullmatch(r"\d+", value):
+        return f"patrol-data-{value}.wikitable"
+
+    if re.fullmatch(r"patrol-data-\d+\.wikitable", value):
+        return value
+
+    raise ValueError(
+        f"Invalid patrol_data_file: {value}\n"
+        f"Expected either ID (e.g. 103623) or filename patrol-data-XXXX.wikitable"
+    )
+
+
 if __name__ == "__main__":
-    patrol_data_file = sys.argv[1] if len(sys.argv) > 1 else "patrol_data.wikitable"
-    another_data_file = sys.argv[2] if len(sys.argv) > 2 else "patrol_data_Big.wikitable"
-    if not os.path.exists(another_data_file):
+    raw_patrol = sys.argv[1] if len(sys.argv) > 1 else "103604"
+    raw_another = sys.argv[2] if len(sys.argv) > 2 else ""
+
+    patrol_data_file = normalize_patrol_filename(raw_patrol)
+    another_data_file = normalize_patrol_filename(raw_another) if raw_another else ""
+    if another_data_file and not os.path.exists(another_data_file):
         print(f"[WARN] No such file: {another_data_file}, so it will not be used")
         another_data_file = ""
     if patrol_data_file == another_data_file:
@@ -323,6 +365,16 @@ if __name__ == "__main__":
         another_data_file = ""
     if patrol_data_file.startswith("quarry") or another_data_file.startswith("quarry"):
         raise ValueError("Patrol data files must not start with 'quarry'")
+
+    # --- patrol_data-XXXX.wikitable ---
+    m = re.fullmatch(r"patrol-data-(\d+)\.wikitable", patrol_data_file)
+    if not m:
+        raise ValueError(
+            f"Invalid patrol_data_file name: {patrol_data_file}\n"
+            f"Expected format: patrol-data-XXXX.wikitable"
+        )
+
+    patrol_id = m.group(1)
 
     quarry_folder = os.path.dirname(os.path.abspath(__file__))
 
@@ -332,11 +384,11 @@ if __name__ == "__main__":
     quarries_dir = "quarries"
     os.makedirs(quarries_dir, exist_ok=True)
 
-    # 🕒 backup filename
+    # 🕒 backup
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     backup_path = os.path.join(
         backup_dir,
-        f"{patrol_data_file}.wikitable.bak_{timestamp}"
+        f"{patrol_data_file}.bak_{timestamp}"
     )
 
     # 💾 save backup
@@ -349,34 +401,30 @@ if __name__ == "__main__":
     # 📖 read files
     with open(patrol_data_file, encoding="utf-8") as f:
         t1 = f.read()
+
     if another_data_file:
         with open(another_data_file, encoding="utf-8") as f:
             t2 = f.read()
         t1 = remove_rows_present_in_other(t1, t2)
 
-    # read all quarry*.wikitable files
-    quarry_files = []
-    quarry_paths = []
+    all_quarry_paths, latest_quarries = get_quarries()
+    if patrol_id not in latest_quarries:
+        raise FileNotFoundError(f"No quarry found for patrol id {patrol_id}")
 
-    for filename in os.listdir(quarry_folder):
-        if re.fullmatch(r"quarry.*\.wikitable", filename):
-            path = os.path.join(quarry_folder, filename)
-            with open(path, encoding="utf-8") as f:
-                quarry_files.append(f.read())
-            quarry_paths.append(path)
-
-    if not quarry_paths:
-        raise FileNotFoundError("No quarry files found")
+    run, selected_path = latest_quarries[patrol_id]
+    print(f"[LOG] Using quarry id={patrol_id}, run={run}")
+    with open(selected_path, encoding="utf-8") as f:
+        quarry_files = [f.read()]
 
     # ⚙️ processing
     result, stats = process(t1, quarry_files)
 
-    # ✍️ overwrite
+    # ✍️ write result
     with open(patrol_data_file, "w", encoding="utf-8") as f:
         f.write(result)
 
-    # 📦 move processed quarry files
-    for path in quarry_paths:
+    # 📦 move ALL quarry files
+    for path in all_quarry_paths:
         try:
             filename = os.path.basename(path)
             new_path = os.path.join(quarries_dir, filename)
@@ -386,7 +434,7 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"Failed to move {path}: {e}")
 
-    # 🧹 limit folders size (10 MB each)
+    # 🧹 limit folders
     enforce_folder_limit(backup_dir, 10 * 1024 * 1024)
     enforce_folder_limit(quarries_dir, 10 * 1024 * 1024)
 
