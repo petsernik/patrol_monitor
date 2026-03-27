@@ -85,11 +85,17 @@ class Stats:
 
 def split_table(text):
     lines = text.strip().splitlines()
-    header, rows = [], []
+    header = []
+    rows = []
     current = []
     in_rows = False
 
     for line in lines:
+        line_stripped = line.strip()
+
+        # Ignore table closing marker
+        if line_stripped == "|}":
+            continue
         if line.startswith("|-"):
             in_rows = True
             if current:
@@ -100,6 +106,7 @@ def split_table(text):
         else:
             header.append(line)
 
+    # Append last row if exists
     if current:
         rows.append("\n".join(current))
 
@@ -150,24 +157,23 @@ def was_unreviewed_stable(title, current_value):
     return True
 
 
-def update_row(row1, row2, title):
-    cells1 = split_cells(row1)
-    cells2 = split_cells(row2)
+def update_row(row1, row2):
+    if row1 != row2:
+        # Use quarry row as source of truth
+        new_row = row2
 
-    changed = False
-    if len(cells1) > 1 and len(cells2) > 1 and cells1[1] != cells2[1]:
-        cells1[1] = cells2[1]
-        changed = True
-    if len(cells1) > 2 and len(cells2) > 2 and cells1[2] != cells2[2]:
-        cells1[2] = cells2[2]
-        changed = True
-    if changed:
-        row1 = mark_orange(row1)
-    else:
-        row1 = remove_yellow_if_old(row1, title)
-        row1 = remove_orange_if_stable(row1, title)
-    style = row1.split("\n", 1)[0]
-    return join_row(style, cells1), changed
+        # Apply orange highlight
+        new_row = mark_orange(new_row)
+
+        return new_row, True
+
+    # No changes → keep row but normalize styling
+    title = extract_title(row1)
+
+    row1 = remove_yellow_if_old(row1, title)
+    row1 = remove_orange_if_stable(row1, title)
+
+    return row1, False
 
 
 def mark_green(row):
@@ -238,7 +244,7 @@ def remove_rows_present_in_other(text1: str, text2: str) -> tuple[str, int]:
         else:
             _removed += 1
 
-    return header1 + "\n" + "\n".join(filtered_rows) + "\n", _removed
+    return header1 + "\n" + "\n".join(filtered_rows) + "\n|}\n", _removed
 
 
 def process(t1: str, quarry: str) -> tuple[str, Stats]:
@@ -257,7 +263,7 @@ def process(t1: str, quarry: str) -> tuple[str, Stats]:
 
     for title, row1 in dict1.items():
         if title in dict2:
-            updated_row, changed = update_row(row1, dict2[title], title)
+            updated_row, changed = update_row(row1, dict2[title])
             result.append(updated_row)
             if changed:
                 stats.modified += 1
@@ -287,7 +293,9 @@ def process(t1: str, quarry: str) -> tuple[str, Stats]:
 
     stats.total = len(result)
 
-    return header + "\n" + "\n".join(result) + "\n", stats
+    result_with_new_lines = "\n".join(result)
+    assert "|}" not in result_with_new_lines
+    return header + "\n" + result_with_new_lines + "\n|}\n", stats
 
 
 def process_single_file(patrol_file, latest_quarries):
