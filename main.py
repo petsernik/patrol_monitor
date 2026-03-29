@@ -298,36 +298,6 @@ def process(t1: str, quarry: str) -> tuple[str, Stats]:
     return header + "\n" + result_with_new_lines + "\n|}\n", stats
 
 
-def process_single_file(patrol_file, latest_quarries):
-    m = re.fullmatch(r"patrol-data-(\d+)\.wikitable", patrol_file)
-    if not m:
-        raise ValueError(f"Invalid patrol file: {patrol_file}")
-
-    patrol_id = m.group(1)
-
-    if patrol_id not in latest_quarries:
-        raise FileNotFoundError(f"No quarry found for patrol id {patrol_id}")
-
-    run, selected_path = latest_quarries[patrol_id]
-    print(f"[LOG] Processing {patrol_file} with quarry run={run}")
-
-    with open(patrol_file, encoding="utf-8") as f:
-        t1 = normalize_spaces(f.read())
-
-    with open(selected_path, encoding="utf-8") as f:
-        quarry_text = normalize_spaces(f.read())
-
-    result, stats = process(t1, quarry_text)
-
-    with open(patrol_file, "w", encoding="utf-8") as f:
-        f.write(result)
-
-    _, rows = split_table(result)
-    titles = {extract_title(r) for r in rows if extract_title(r)}
-
-    return stats, titles
-
-
 def independent_process(*files):
     all_quarry_paths, latest_quarries = get_quarries()
 
@@ -343,7 +313,32 @@ def independent_process(*files):
         build_recent_backup_sets(patrol_file)
 
         # processing
-        stats, _ = process_single_file(patrol_file, latest_quarries)
+        m = re.fullmatch(r"patrol-data-(\d+)\.wikitable", patrol_file)
+        if not m:
+            raise ValueError(f"Invalid patrol file: {patrol_file}")
+
+        patrol_id = m.group(1)
+
+        if patrol_id not in latest_quarries:
+            raise FileNotFoundError(f"No quarry found for patrol id {patrol_id}")
+
+        run, selected_path = latest_quarries[patrol_id]
+        print(f"[LOG] Processing {patrol_file} with quarry run={run}")
+
+        with open(patrol_file, encoding="utf-8") as f:
+            t1 = normalize_spaces(f.read())
+
+        with open(selected_path, encoding="utf-8") as f:
+            quarry_text = normalize_spaces(f.read())
+
+        result, stats = process(t1, quarry_text)
+
+        with open(patrol_file, "w", encoding="utf-8") as f:
+            f.write(result)
+
+        _, rows = split_table(result)
+
+        print(f'ID {patrol_id} stats:\n{stats}')
         total_stats.add(stats)
 
     return total_stats
@@ -401,6 +396,7 @@ def dependent_process(*files):
             if title:
                 accumulated_titles.add(title)
 
+        print(f'ID {patrol_id} stats:\n{stats}')
         total_stats.add(stats)
 
     return total_stats
@@ -552,4 +548,4 @@ if __name__ == "__main__":
     enforce_folder_limit(quarries_dir, 50 * 1024 * 1024)
 
     print("Done ✅")
-    print(stats)
+    print(f"Total stats:\n{stats}")
