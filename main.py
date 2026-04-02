@@ -6,16 +6,18 @@ from datetime import datetime
 
 _recent_backup_sets = []
 _recent_unreviewed = []
+_recent_striked = []
 
 
 def build_recent_backup_sets(patrol_file, hours=48):
-    global _recent_backup_sets, _recent_unreviewed
+    global _recent_backup_sets, _recent_unreviewed, _recent_striked
 
     now = datetime.now().timestamp()
     limit = hours * 3600
 
     sets = []
     unreviewed_sets = []
+    striked_copy = []
 
     for name in os.listdir(backup_dir):
         m = re.fullmatch(rf"{re.escape(patrol_file)}\.bak_\d{{8}}_\d{{6}}", name)
@@ -40,6 +42,7 @@ def build_recent_backup_sets(patrol_file, hours=48):
 
         titles = set()
         values = {}
+        striked = {}
 
         for r in rows:
             t = extract_title(r)
@@ -48,13 +51,15 @@ def build_recent_backup_sets(patrol_file, hours=48):
 
             titles.add(t)
             values[t] = extract_unreviewed(r)
+            striked[t] = is_striked(r)
 
         sets.append(titles)
         unreviewed_sets.append(values)
+        striked_copy.append(striked)
 
     _recent_backup_sets = sets
     _recent_unreviewed = unreviewed_sets
-
+    _recent_striked = striked_copy
 
 # --- Statistics class ---
 
@@ -145,6 +150,13 @@ def extract_last_review(row):
 
 
 # --- Change logic ---
+def is_striked(row):
+    return "<s>" in row
+
+
+def was_striked_stable(title):
+    return all((title in s) and s[title] for s in _recent_striked)
+
 
 def missing_title_in_some_recent_backup(title):
     return any(title not in s for s in _recent_backup_sets)
@@ -262,6 +274,9 @@ def process(t1: str, quarry: str) -> tuple[str, Stats]:
     stats = Stats()
 
     for title, row1 in dict1.items():
+        if is_striked(row1) and was_striked_stable(title):
+            stats.removed += 1
+            continue
         if title in dict2:
             updated_row, changed = update_row(row1, dict2[title])
             result.append(updated_row)

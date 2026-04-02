@@ -33,7 +33,7 @@
 patrol-data-XXXX.wikitable
 ```
 
-где `XXXX` — ID запроса (например, `103590`)
+где `XXXX` — ID запроса в Quarry, содержащийся в ссылке (`103590`)
 
 5. После обновления Quarry:
 
@@ -121,7 +121,7 @@ and based on queries in Quarry: [https://quarry.wmcloud.org](https://quarry.wmcl
 patrol-data-XXXX.wikitable
 ```
 
-where `XXXX` is the query ID (e.g. 103590)
+where `XXXX` is the query ID from Quarry link (`103590`)
 
 5. When Quarry output updates:
 
