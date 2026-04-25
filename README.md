@@ -24,7 +24,7 @@
 
 2. Сделайте fork и запустите его.
 
-3. Скачайте результат:
+3. Скачайте результат кнопками на сайте:
    **Download Data → wikitable**
 
 4. Поместите файл в репозиторий и переименуйте его в:
@@ -38,7 +38,8 @@ patrol-data-XXXX.wikitable
 5. После обновления Quarry:
 
    * скачайте новый файл
-   * переместите его в папку (без переименования)
+   * переместите его в дефолтную папку Загрузки/Downloads (без переименования файла),
+   если Вы не меняли настройки куда скачивать по умолчанию, то файл уже там
 
 6. Запустите скрипт:
 
@@ -112,7 +113,7 @@ and based on queries in Quarry: [https://quarry.wmcloud.org](https://quarry.wmcl
 
 2. Fork and run it.
 
-3. Download the result:
+3. Download the result by buttons on the site:
    Download Data → wikitable
 
 4. Copy the file into the repository and rename it to:
@@ -126,7 +127,8 @@ where `XXXX` is the query ID from Quarry link (`103590`)
 5. When Quarry output updates:
 
    * download the new version
-   * move the file in the folder (without renaming)
+   * move the file in the default user folder "Downloads" (without renaming file),
+   if you don't change default download settings you don't need to do anything
 
 6. Run the script:
 

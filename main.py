@@ -9,7 +9,7 @@ _recent_unreviewed = []
 _recent_striked = []
 
 
-def build_recent_backup_sets(patrol_file, hours=48):
+def build_recent_backup_sets(patrol_file, hours=24*8):
     global _recent_backup_sets, _recent_unreviewed, _recent_striked
 
     now = datetime.now().timestamp()
@@ -518,7 +518,8 @@ if __name__ == "__main__":
 
         patrol_files.append(pf)
 
-    quarry_folder = os.path.dirname(os.path.abspath(__file__))
+    # quarry_folder = os.path.dirname(os.path.abspath(__file__))
+    quarry_folder = os.path.join(os.path.expanduser("~"), "Downloads")
 
     # 📁 create folders
     backup_dir = "backups"
